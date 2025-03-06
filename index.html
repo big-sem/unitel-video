@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Unitel Video</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: black;
+      }
+      #video {
+        object-fit: cover;
+        width: 100vw;
+        height: 100vh;
+      }
+      #poster {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: url('https://images.pexels.com/photos/842711/pexels-photo-842711.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1')
+          center/cover no-repeat;
+        display: block;
+        z-index: 100;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="poster"></div>
+    <video id="video">
+    <script type="module">
+      import { connect, JSONCodec } from 'https://cdn.jsdelivr.net/npm/nats.ws@1.7.1/esm/nats.js'
+      const jsonCodec = JSONCodec()
+      const VIDEO_SOURCES = ['assets/s1.mp4', 'assets/s2.mp4', 'assets/s3.mp4', 'assets/s4.mp4', 'assets/s5.mp4']
+      let currentVideoIndex = 0
+
+      const video = document.getElementById('video')
+      const videoSource = document.getElementById('source')
+      const poster = document.getElementById('poster')
+
+      function changeVideoSource() {
+        currentVideoIndex = (currentVideoIndex + 1) % VIDEO_SOURCES.length
+        video.src = VIDEO_SOURCES[currentVideoIndex]
+        video.load()
+      }
+
+      video.src = VIDEO_SOURCES[currentVideoIndex]
+      video.load()
+      video.addEventListener('ended', () => {
+        changeVideoSource()
+        video.play()
+      })
+
+      function showPoster() {
+        poster.style.zIndex = 1
+        // poster.style.display = 'block'
+        // video.style.display = 'none'
+      }
+
+      function hidePoster() {
+        poster.style.zIndex = -1
+        // poster.style.display = 'none'
+        // video.style.display = 'block'
+      }
+      ;(async () => {
+        try {
+          const natsServer = await connect({
+            servers: 'wss://nats.clix.mn:8443',
+            user: 'qparking:device',
+            pass: 'Cd4l1vJC4^2G3Cjh4$mVm',
+          })
+
+          console.log('NATS connected')
+          const natsTopic = 'unitel.device.distance1'
+          const subscription = natsServer.subscribe(natsTopic)
+          async function listen(sub) {
+            for await (const message of sub) {
+              const { data } = message
+              const { command } = jsonCodec.decode(data)
+              console.log(command, 'decodedData')
+              if (command === 'play') {
+                video.play().catch((error) => {
+                  console.error('Error playing video:', error)
+                })
+                hidePoster()
+              } else if (command === 'stop') {
+                changeVideoSource()
+                showPoster()
+              }
+              console.log('loop')
+            }
+          }
+          await listen(subscription)
+          await natsServer.closed()
+        } catch (error) {
+          console.error('Error connecting to NATS server:', error)
+        }
+      })()
+    </script>
+  </body>
+</html>
