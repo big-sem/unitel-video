@@ -66,6 +66,12 @@
         // poster.style.display = 'none'
         // video.style.display = 'block'
       }
+      document.addEventListener('click', () => {
+        video.play().catch((error) => {
+          console.error('Error playing video:', error)
+        })
+        hidePoster()
+      })
       ;(async () => {
         try {
           const natsServer = await connect({
